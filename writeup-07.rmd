@@ -1,0 +1,155 @@
+---
+title: "Machine Learning Prediction Writeup"
+output: html_document
+---
+
+```{r echo=FALSE}
+options(warn=-1)
+suppressMessages(library(caret))
+suppressMessages(library(doParallel))
+suppressMessages(library(randomForest))
+
+```
+##Human Activity Recognition with Wearable Accelerometers
+
+###Data Description
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit, it is now easy to collect a large amount of data about personal activity. These types of devices are part of the "quantified self movement - a group of enthusiasts who take measurements of their actions regularly. Although some people often quantify how much of a particular activity they do, they rarely quantify how well they do it. This project uses data from accelerometers on the belt, forearm, arm, and dumbell of six participants. They were asked to perform barbell lifts correctly and incorrectly in five different ways:
+
+
+    1. Exactly according to the specification
+    2. Throwing elbows to the front
+    3. Lifting the dumbbell only halfway
+    4. lowering the dumbbell only halfway
+    5. throwing the hips to the front
+
+More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+###Objectives
+
+The goal of this project was to predict the manner (see above) in which the subjects did the exercise when given relevant information.
+
+###Preparing the Data
+
+The data was obtained from: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+```{r echo=FALSE}
+set.seed(6486)
+
+data.training <- read.csv("pml-training.csv",row.names=1,na.strings = "")
+data.testing <- read.csv("pml-testing.csv",row.names=1,na.strings = "NA")
+
+```
+
+The data source has 159 variables. The first seven columns of the data (<i>X, user name, raw timestamp part 1, raw timestamp part 2, cvtd timestamp, new window, num window</i>) will be removed, since these do not appear to be accelerometer measurements which will not have an effect in prediction. 
+
+Sparse variables have few observations, so they have weak predictive value. These variables will be removed unless at least 80% of their observations are present.
+
+Variables with few unique values are also removed, since their invariance adds little to the predictive accuracy of the model.
+
+Lastly, variables that are too highly correlated are removed since they are not very useful. This step reduced the number of variables in the data from 53 to 46.
+
+```{r}
+dim(data.training)
+
+data.training <- data.training[,c(8:ncol(data.training))] #from 159 vars
+
+dim(data.training)
+
+data.training <- data.training[,colSums(is.na(data.training)) < .8]
+
+dim(data.training)
+
+nsv <- nearZeroVar(data.training, saveMetrics = TRUE)
+data.training <- data.training[,!nsv$nzv]
+
+dim(data.training)
+
+highCorrelations <- cor(na.omit(data.training[sapply(data.training, is.numeric)]))
+highCorr<-findCorrelation(highCorrelations, cutoff = .90, verbose = FALSE)
+data.training<- data.training[,-highCorr]
+
+dim(data.training)
+
+```
+
+This leaves us with 45 predictors and the "classe" variable in the training data.
+
+We will split the training data into a "training" set and a "validating" set. The training subset will include 75% of the observations and the remaining validation data will be used to calculate the out-of-sample error.
+
+```{r}
+xdata <- createDataPartition(y = data.training$classe, p = .75, list = FALSE )
+data.validating <- data.training[-xdata,]
+data.training <- data.training[xdata,]
+```
+```{r echo=FALSE}
+#use the following only if you have multiple cores to exploit
+cl <- makeCluster(detectCores())
+registerDoParallel(cl)
+```
+
+####Random Forest Model
+
+There does not seem to be any predictors strongly correlated with the outcome variable, so linear regression model may not be a good option. Instead, a classifcation algorithm -- Random Forest model -- will be used. This model uses bagging and random subsets of variables from the training data to prevent overfitting. In this algorithm, many different trees are created for cross validation. 
+
+```{r}
+
+model.rf <- randomForest(classe~., data = data.training)
+
+```
+####Training Statistics
+
+```{r}
+
+predict.rf <- predict(model.rf, data.training, type = "class")
+confusionMatrix(predict.rf, data.training$classe)
+
+```
+
+Now we test our model on the out-of-sample dataset. The error is expected to be higher than with our out-of-sample data, but hopefully as close as possible.
+
+####Validation Statistics
+
+```{r}
+
+predictions.validating <- predict(model.rf, newdata = data.validating)
+confusionMatrix(predictions.validating, data.validating$classe)
+
+```
+
+Our Random Forest algorithm generates a model with accuracy 0.994 on our validation data. Since this is satisfactory, there is no need to go back and include more variables with imputations. However, we will still look at which variables are the most important.
+
+```{r}
+varImp(model.rf, scale = TRUE)
+
+```
+
+The four most important variables according to the model fit are 'yaw_belt', 'pitch_forearm', 'magnet_dumbell_z' and 'pitch_belt'. These variables have the most effect on the model's predictive performance. 
+
+The model could be fine-tuned to use only the most important predictors. Although this could increase the speed of the model without reducing accuracy significantly, this step is not needed for this project.
+
+####Conclusion
+
+A Random Forest model was created to predict the manner that an exercise was performed given relevant data predicting five classes ('A', 'B', 'C', 'D', 'E') using 45 predictors. The model We used 53 variables from the training dataset to build a random forest model with four-fold cross validation. The accuracy of the model is 0.988 tested on the out-of-sample data above.
+
+```{r echo=FALSE}
+predictions <- predict(model.rf, data.testing, type = "class")
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+pml_write_files(predictions)
+
+
+#for(i in 1:length(predictions)){write.table(predictions[i],file=paste0("problem_id_",i,".txt"),quote=FALSE,row.names=FALSE,col.names=FALSE)}
+
+
+#predictions <- predict(model.rf, data.testing ,type="class")
+#for(i in 1:length(predictions)){write.table(predictions[i],file=paste0("problem_id_",i,".txt"),quote=FALSE,row.names=FALSE,col.names=FALSE)}
+#answers <- as.character(predictions)
+#predictions
+
+```
