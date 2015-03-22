@@ -1,4 +1,3 @@
-
 <div class="container-fluid main-container">
 
 
@@ -98,8 +97,9 @@ confusionMatrix(predict.rf, data.training$classe)</code></pre>
 ## Balanced Accuracy      1.0000   1.0000   1.0000   1.0000   1.0000</code></pre>
 <p>Now we test our model on the out-of-sample dataset. The error is expected to be higher than with our out-of-sample data, but hopefully as close as possible.</p>
 </div>
-<div id="validation-statistics" class="section level4">
-<h4>Validation Statistics</h4>
+<div id="expected-out-of-sample-error" class="section level4">
+<h4>Expected Out-of-Sample Error</h4>
+<p>The model was tested on the validation data to get the expected out-of-sample error.</p>
 <pre class="r"><code>predictions.validating &lt;- predict(model.rf, newdata = data.validating)
 confusionMatrix(predictions.validating, data.validating$classe)</code></pre>
 <pre><code>## Confusion Matrix and Statistics
@@ -133,7 +133,11 @@ confusionMatrix(predictions.validating, data.validating$classe)</code></pre>
 ## Detection Rate         0.2843   0.1913   0.1727   0.1623   0.1835
 ## Detection Prevalence   0.2851   0.1927   0.1758   0.1625   0.1839
 ## Balanced Accuracy      0.9991   0.9933   0.9935   0.9949   0.9992</code></pre>
-<p>Our Random Forest algorithm generates a model with accuracy 0.994 on our validation data. Since this is satisfactory, there is no need to go back and include more variables with imputations. However, we will still look at which variables are the most important.</p>
+<p>Calculate the the expected out-of-sample error:</p>
+<pre class="r"><code>oose &lt;- 1 - as.numeric(confusionMatrix(predictions.validating, data.validating$classe)$overall[1])
+oose</code></pre>
+<pre><code>## [1] 0.00591354</code></pre>
+<p>Our Random Forest algorithm generates a model with accuracy 0.994 on our validation data. The out-of-sampe error is 0.59%. Since this is satisfactory, there is no need to go back and include more variables with imputations. However, we will still look at which variables are the most important.</p>
 <pre class="r"><code>varImp(model.rf, scale = TRUE)</code></pre>
 <pre><code>##                        Overall
 ## pitch_belt           614.51519
