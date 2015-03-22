@@ -1,9 +1,11 @@
 
 <div class="container-fluid main-container">
 
+
 <div id="header">
 <h1 class="title">Machine Learning Prediction Writeup</h1>
 </div>
+
 
 <div id="human-activity-recognition-with-wearable-accelerometers" class="section level2">
 <h2>Human Activity Recognition with Wearable Accelerometers</h2>
